@@ -47,6 +47,12 @@
 #define MENU_SET_CLOCK                  8         // Enter Setup:Set Clock      Submenu
 #define MENU_CALIBRATE                  9         // Enter Setup:Calibrate      Submenu
 
+//Submenu Setting
+#define SUBMENU_SET_SHOW                           1
+#define SUBMENU_SET_SET                            2
+#define SUBMENU_SET_CLOCK                          3
+#define SUBMENU_SET_CALIBRATE                      4
+
 // Submenu: Power
 #define SUBMENU_POWER_STD               1
 #define SUBMENU_POWER_LOW               2
@@ -104,34 +110,40 @@
 //#define ALL_ROWS                        (ROW0 | ROW1 | ROW2)
 #define ALL_ROWS                        (ROW1 | ROW2)
 
+//Keyboard
+#define DOWN_KEY   2
+#define UP_KEY    12
+#define ENTER_KEY  3
+#define ESC_KEY   13
+
 // Agg. Size, Slope, and Offset for Mega-Pascals (MPa)
 #define AGG_SIZE_LIMIT_1_MPA            660
 #define AGG_SIZE_LIMIT_2_MPA            840
 #define AGG_SIZE_LIMIT_3_MPA            1170
 
-#define OFFSET_LARGE_3_MPA              2372
-#define OFFSET_LARGE_4_MPA              2471
-#define OFFSET_LARGE_5_MPA              2958
-#define OFFSET_LARGE_6_MPA              3653
-#define OFFSET_LARGE_7_MPA              4331
+#define OFFSET_LARGE_3_MPA              220
+#define OFFSET_LARGE_4_MPA              255
+#define OFFSET_LARGE_5_MPA              300
+#define OFFSET_LARGE_6_MPA              365
+#define OFFSET_LARGE_7_MPA              435
 
-#define OFFSET_SMALL_3_MPA              4366
-#define OFFSET_SMALL_4_MPA              5093
-#define OFFSET_SMALL_5_MPA              6060
-#define OFFSET_SMALL_6_MPA              7311
-#define OFFSET_SMALL_7_MPA              8791
+#define OFFSET_SMALL_3_MPA              437
+#define OFFSET_SMALL_4_MPA              517
+#define OFFSET_SMALL_5_MPA              598
+#define OFFSET_SMALL_6_MPA              731
+#define OFFSET_SMALL_7_MPA              879
 
-#define SLOPE_LARGE_3_MPA               0.9351
-#define SLOPE_LARGE_4_MPA               0.9321
-#define SLOPE_LARGE_5_MPA               0.9898
-#define SLOPE_LARGE_6_MPA               1.086
-#define SLOPE_LARGE_7_MPA               1.179
+#define SLOPE_LARGE_3_MPA               91
+#define SLOPE_LARGE_4_MPA               94
+#define SLOPE_LARGE_5_MPA               100
+#define SLOPE_LARGE_6_MPA               109
+#define SLOPE_LARGE_7_MPA               118
 
-#define SLOPE_SMALL_3_MPA               1.810
-#define SLOPE_SMALL_4_MPA               1.888
-#define SLOPE_SMALL_5_MPA               2.000
-#define SLOPE_SMALL_6_MPA               2.172
-#define SLOPE_SMALL_7_MPA               2.375
+#define SLOPE_SMALL_3_MPA               181
+#define SLOPE_SMALL_4_MPA               190
+#define SLOPE_SMALL_5_MPA               199
+#define SLOPE_SMALL_6_MPA               217
+#define SLOPE_SMALL_7_MPA               237
 
 // Conversion Factors
 #define ADC_SCALE_FACTOR_METRIC         3810
@@ -154,10 +166,9 @@
 //******************************************************************************
 //  Prototypes (Global)
 //******************************************************************************
-#use                                    delay(clock = 4000000)
+#use                                    DELAY(clock = 4000000)
 #use                                    fixed_io(b_outputs = pin_b2, pin_b3)
-//#use                                    i2c(master, sda = PIN_C4, scl = PIN_C3, slow)
-#use                                    i2c(master, sda = PIN_C4, scl = PIN_C3)
+#use                                    i2c(MASTER, sda = PIN_C4, scl = PIN_C3, SLOW, FORCE_SW)
 #use                                    rs232(baud = 9600, xmit = PIN_C6, rcv = PIN_C7, brgh1ok)
 
 // Config
@@ -168,7 +179,7 @@ void                                    Config_setSettings(void);
 
 // Display
 void                                    Display_checkTestData(void);
-#separate signed long                   Display_doCalculation(float x);
+/*#separate*/ int32                   Display_doCalculation(float x);
 void                                    Display_showData(void);
 void                                    Display_showDecimal(int data);
 void                                    Display_showDistance(void);
@@ -183,7 +194,7 @@ void                                    Display_showSubmenuSetClock(void);
 void                                    Display_showSubmenuSetSettings(byte data);
 void                                    Display_showSubmenuShowSettings(void);
 void                                    Display_showTime(void);
-void                                    Display_updateDisplayPressure(signed long pressure);
+void                                    Display_updateDisplayPressure(int32 pressure);
 
 // Keyboard
 void                                    Keyboard_getDownKey(void);

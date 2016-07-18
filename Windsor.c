@@ -33,7 +33,7 @@ byte                adcZero;
 short int           calStartCal;
 short int           dataClear;
 byte                dataTestNumber;
-signed long         distance;
+int32         distance;
 long                eepromMemPtr;
 short int           keyClear;
 signed              keyCount;
@@ -68,6 +68,7 @@ short int           testDone;
 short int           testError;
 short int           testOk;
 byte                testSetCount;
+//short int           testSetCount;
 short int           testShowT;
 byte                timeRTCData[7];
 short int           timeSetClock;
@@ -111,11 +112,8 @@ void Config_initialize(void)
   showTest = false;
   showTime = true;
   showTitle = true;
-  //submenuSetAggSize = false;
   submenuSetDensity = false;
   submenuSetMohs = false;
-  //submenuSetPower = false;
-  //submenuSetUnits = false;
   submenuSetWeight = false;
   testClearT = false;
   testDone = false;
@@ -171,7 +169,7 @@ void Config_loadSetup(void)
 
   eepromMemPtr = EEPROM_TESTS;
   testSetCount = Peripheral_readEEPROM();
-
+  
   Peripheral_scaleADC();
 }
 
@@ -234,7 +232,7 @@ void Config_setSettings(void)
   if (keySet)
   {
     keySet = false;
-    if (submenuSetPower)
+    if (submenuSetPower)     
     {
       submenuPower = keyCount;                    // This line must be first.
       submenuSetPower = false;
@@ -318,26 +316,38 @@ void Config_setSettings(void)
   if (submenuSetPower)
   {
     strcpy(lcdData, "Set Power");
+    keyCount = keycount>SUBMENU_POWER_HIGH?SUBMENU_POWER_STD:keyCount;
+    keyCount = keycount<SUBMENU_POWER_STD?SUBMENU_POWER_STD:keyCount;//keycount comes in here out of bounds displays set power twice?
   }
   else if (submenuSetDensity)
   {
     strcpy(lcdData, "Set Density");
+    keyCount = keycount>SUBMENU_DENSITY_LIGHT?SUBMENU_DENSITY_STD:keyCount;
+    keyCount = keycount<SUBMENU_DENSITY_STD?SUBMENU_DENSITY_STD:keyCount;    
   }
   else if (submenuSetWeight)
   {
     strcpy(lcdData, "Set Weight");
+    keyCount = keycount>SUBMENU_WEIGHT_SUPER_LOW?SUBMENU_WEIGHT_MED:keyCount;
+    keyCount = keycount<SUBMENU_WEIGHT_HIGH?SUBMENU_WEIGHT_MED:keyCount;
   }
   else if (submenuSetMohs)
   {
     strcpy(lcdData, "Set Mohs");
+    keyCount = keycount>SUBMENU_MOH_7?SUBMENU_MOH_4:keyCount;
+    keyCount = keycount<SUBMENU_MOH_3?SUBMENU_MOH_4:keyCount;
   }
   else if (submenuSetUnits)
   {
     strcpy(lcdData, "Set Units");
+    keyCount = keycount<SUBMENU_UNITS_MPA?SUBMENU_UNITS_MPA:keyCount;
+    keyCount = keycount>SUBMENU_UNITS_PSI?SUBMENU_UNITS_PSI:keyCount;
   }
   else
   {
     strcpy(lcdData, "Set Aggr Size");
+    keyCount = keycount>SUBMENU_AGG_SIZE_LARGE?SUBMENU_AGG_SIZE_SMALL:keyCount;
+    keyCount = keycount<SUBMENU_AGG_SIZE_MED?SUBMENU_AGG_SIZE_SMALL:keyCount;
   }
   LCD_setCursorPosition(1, 1);
   LCD_updateDisplay();
@@ -497,25 +507,14 @@ void Display_checkTestData(void)
 //
 //  Description:
 //  ============
-//  This function uses the distance measurement to calculate the pressure as
-//  mega-Pascals (MPa).
-//
-//   y = 142 * (Ax^6 + Bx^5 + Cx^4 + Dx^3 + Ex^2 + Fx + 1)
-//
-//   y = pressure
-//   x = scaled distance
-//   A = 2.6763878968888889e-22
-//   B = 2.1129378133333333e-18
-//   C = 1.3900906666666667e-14
-//   D = 7.3162666666666667e-11
-//   E = 2.8880000000000000e-07
-//   F = 7.6000000000000000e-04
-//
+//  
+//  exp(x)
 //******************************************************************************
-#separate signed long Display_doCalculation(float x)
+/*#separate*/ int32 Display_doCalculation(float x)
 {
   float             x_temp;
   float             y_temp;
+  int32              y;
 
   x_temp = (x  * x) / 2;
   y_temp = 1 + x + x_temp;
@@ -527,7 +526,7 @@ void Display_checkTestData(void)
   y_temp += x_temp;
   x_temp = (x_temp * x) / 6;
   y_temp += x_temp;
-
+  y = (int32) y_temp;
   return (y_temp);
 }
 
@@ -643,7 +642,6 @@ void Display_showData(void)
   LCD_updateDisplay();
 }
 
-
 //******************************************************************************
 //
 //  Function: Display_showDecimal()
@@ -666,7 +664,6 @@ void Display_showDecimal(int data)
   lcdData[lcdPosition++] = temp + '0';
   lcdData[lcdPosition  ] = data + '0';
 }
-
 
 //******************************************************************************
 //
@@ -727,7 +724,6 @@ void Display_showDistance(void)
 //******************************************************************************
 void Display_showMenuDownloadTests()
 {
-//  byte              receivedChar;
 
    if (menuInitSubmenu)
    {
@@ -751,14 +747,15 @@ void Display_showMenuDownloadTests()
       }
       else
       {
-//      receivedChar = 'E';
-//      while (receivedChar != 'S')
-//      {
-        // Wait until the start command ('S') is received from the PC
-//        receivedChar = getc();
-//      }
       putc(testSetCount + 48);
-      for (eepromMemPtr = 0 ; eepromMemPtr < testSetCount * TEST_SET_SIZE ; ++eepromMemPtr)
+  //eepromMemPtr = testSetCount * TEST_SET_SIZE;  // Since this line that doesn't work, it has been replaced with a loop.
+      int16  totalmemory = 0;
+      for (int16 i = 0; i < testSetCount ; i++)
+      {
+         totalmemory += TEST_SET_SIZE;
+      }      
+      
+      for (eepromMemPtr = 0 ; eepromMemPtr < totalmemory/*testSetCount * TEST_SET_SIZE*/ ; ++eepromMemPtr)
       {
         putc(Peripheral_readEEPROM() + 48);
       }
@@ -813,42 +810,39 @@ void Display_showMenuEnterSetup(void)
   if (keySet)
   {
     keySet = false;
-    if (keyCount == 1)
-    {
-      menuLocationNum = MENU_SHOW_SETTINGS;
-    }
-    else if (keyCount == 2)
-    {
-      menuLocationNum = MENU_SET_SETTINGS;
-    }
-    else if (keyCount == 3)
-    {
-      menuLocationNum = MENU_SET_CLOCK;
-    }
-    else if (keyCount == 4)
-    {
-      menuLocationNum = MENU_CALIBRATE;
-    }
     menuInitSubmenu = true;
+    switch(keyCount){      
+    case SUBMENU_SET_SHOW:
+      menuLocationNum = MENU_SHOW_SETTINGS;
+      break;
+    case SUBMENU_SET_SET:
+      menuLocationNum = MENU_SET_SETTINGS;
+      break;
+    case SUBMENU_SET_CLOCK:
+      menuLocationNum = MENU_SET_CLOCK;
+      break;
+    case SUBMENU_SET_CALIBRATE:
+      menuLocationNum = MENU_CALIBRATE;
+      break;
+    }
   }
+  
   LCD_clearDisplay();
+      switch(keyCount){      
+    case SUBMENU_SET_SHOW:
+      strcpy(lcdData, "Show Settings");
+      break;
+    case SUBMENU_SET_SET:
+      strcpy(lcdData, "Set Settings");
+      break;
+    case SUBMENU_SET_CLOCK:
+      strcpy(lcdData, "Set Clock");
+      break;
+    case SUBMENU_SET_CALIBRATE:
+      strcpy(lcdData, "Calibrate");
+      break;
+    }
 
-  if (keyCount == 1)
-  {
-    strcpy(lcdData, "Show Settings");
-  }
-  else if (keyCount == 2)
-  {
-    strcpy(lcdData, "Set Settings");
-  }
-  else if (keyCount == 3)
-  {
-    strcpy(lcdData, "Set Clock");
-  }
-  else if (keyCount == 4)
-  {
-    strcpy(lcdData, "Calibrate");
-  }
   LCD_setCursorPosition(1, 1);
   LCD_updateDisplay();
 }
@@ -1077,86 +1071,97 @@ void Display_showMenuShowTests(void)
 //******************************************************************************
 void Display_showPressure(void)
 {
-  float             b;
-  float             m;
-  signed long       y;
+  int16             b;
+  int16             m;
+  int16             min_dist;
+  int32             y;
+  float           fltdistance;
+  float           flty;
+  int32           td;
 
   if (submenuPower == SUBMENU_POWER_HIGH)
   {
-    y = 142 * Display_doCalculation(distance * 0.000760);
+     fltdistance = (float) distance;
+      fltdistance /= 100.0;
+      flty = 28.0 * Display_doCalculation( fltdistance * 0.0602 );
+      y = (int32)flty; 
+      min_dist = 0;
   }
   else
   {
     if (submenuPower == SUBMENU_POWER_STD)
     {
-      if (submenuMohs == SUBMENU_MOH_3)
-      {
-        b = OFFSET_SMALL_3_MPA;
-        m = SLOPE_SMALL_3_MPA;
-      }
-      if (submenuMohs == SUBMENU_MOH_4)
-      {
-        b = OFFSET_SMALL_4_MPA;
-        m = SLOPE_SMALL_4_MPA;
-      }
-      if (submenuMohs == SUBMENU_MOH_5)
-      {
-        b = OFFSET_SMALL_5_MPA;
-        m = SLOPE_SMALL_5_MPA;
-      }
-      if (submenuMohs == SUBMENU_MOH_6)
-      {
-        b = OFFSET_SMALL_6_MPA;
-        m = SLOPE_SMALL_6_MPA;
-      }
-      if (submenuMohs == SUBMENU_MOH_7)
-      {
-        b = OFFSET_SMALL_7_MPA;
-        m = SLOPE_SMALL_7_MPA;
+      switch (submenuMohs){
+      case SUBMENU_MOH_3:
+         b = OFFSET_SMALL_3_MPA;
+         m = SLOPE_SMALL_3_MPA;
+         min_dist = 2800;
+         break;
+      case SUBMENU_MOH_4:
+         b = OFFSET_SMALL_4_MPA;
+         m = SLOPE_SMALL_4_MPA;
+         min_dist = 2900;
+         break;
+      case SUBMENU_MOH_5:
+         b = OFFSET_SMALL_5_MPA;
+         m = SLOPE_SMALL_5_MPA;
+         min_dist = 3300;         
+         break;
+      case SUBMENU_MOH_6:
+         b = OFFSET_SMALL_6_MPA;
+         m = SLOPE_SMALL_6_MPA;
+         min_dist = 3600;         
+         break;
+      case SUBMENU_MOH_7:
+         b = OFFSET_SMALL_7_MPA;
+         m = SLOPE_SMALL_7_MPA;
+         min_dist = 3900;         
+         break;         
       }
     }
     if (submenuPower == SUBMENU_POWER_LOW)
     {
-      if (submenuMohs == SUBMENU_MOH_3)
-      {
-        b = OFFSET_LARGE_3_MPA;
-        m = SLOPE_LARGE_3_MPA;
-      }
-      if (submenuMohs == SUBMENU_MOH_4)
-      {
-        b = OFFSET_LARGE_4_MPA;
-        m = SLOPE_LARGE_4_MPA;
-      }
-      if (submenuMohs == SUBMENU_MOH_5)
-      {
-        b = OFFSET_LARGE_5_MPA;
-        m = SLOPE_LARGE_5_MPA;
-      }
-      if (submenuMohs == SUBMENU_MOH_6)
-      {
-        b = OFFSET_LARGE_6_MPA;
-        m = SLOPE_LARGE_6_MPA;
-      }
-      if (submenuMohs == SUBMENU_MOH_7)
-      {
-        b = OFFSET_LARGE_7_MPA;
-        m = SLOPE_LARGE_7_MPA;
+      switch (submenuMohs){
+      case SUBMENU_MOH_3:
+         b = OFFSET_LARGE_3_MPA;
+         m = SLOPE_LARGE_3_MPA;
+         min_dist = 2800;
+         break;
+      case SUBMENU_MOH_4:
+         b = OFFSET_LARGE_4_MPA;
+         m = SLOPE_LARGE_4_MPA;
+         min_dist = 2900;         
+         break;
+      case SUBMENU_MOH_5:
+         b = OFFSET_LARGE_5_MPA;
+         m = SLOPE_LARGE_5_MPA;
+         min_dist = 3300;
+         break;
+      case SUBMENU_MOH_6:
+         b = OFFSET_LARGE_6_MPA;
+         m = SLOPE_LARGE_6_MPA;
+         min_dist = 3600;         
+         break;
+      case SUBMENU_MOH_7:
+         b = OFFSET_LARGE_7_MPA;
+         m = SLOPE_LARGE_7_MPA;
+         min_dist = 3900;
+         break;
       }
     }
-    y = (m * distance) - b;
+    y = (m*distance/1000) - b; //scaled m up by 100
   }
 
   // Scale for low and super-low weights
   if (submenuWeight == SUBMENU_WEIGHT_LOW)
   {
-    y *= 0.84;
+    y = y * 84 / 100;
   }
   else if (submenuWeight == SUBMENU_WEIGHT_SUPER_LOW)
   {
-    y *= 0.66;
+    y = y * 66 / 100;
   }
-
-  if (y < 0)
+  if (distance < min_dist)
   {
     y = 0;
   }
@@ -1236,7 +1241,6 @@ void Display_showSubmenuCalibrate(void)
     LCD_updateDisplay();
   }
 }
-
 
 //******************************************************************************
 //
@@ -1373,103 +1377,87 @@ void Display_showSubmenuSetClock(void)
 //******************************************************************************
 void Display_showSubmenuSetSettings(byte data)
 {
-  if (data ==  SUBMENU_POWER_STD)
+   switch(data){
+   case SUBMENU_POWER_STD:
+      strcpy(lcdData, "Std Power");
+      break;
+   case SUBMENU_POWER_LOW:
+      strcpy(lcdData, "Low Power");
+      break;
+   case SUBMENU_POWER_HIGH:
+      strcpy(lcdData, "High Perf");
+      break;
+   case SUBMENU_DENSITY_STD:
+      strcpy(lcdData, "Std Wght ");
+      break;
+   case SUBMENU_DENSITY_LIGHT:
+      strcpy(lcdData, "Lgt Wght ");
+      break;      
+   case SUBMENU_MOH_3:
+      strcpy(lcdData, "MOH#3 ");
+      break;
+   case SUBMENU_MOH_4:
+      strcpy(lcdData, "MOH#4 ");
+      break;      
+   case SUBMENU_MOH_5:
+      strcpy(lcdData, "MOH#5 ");
+      break;      
+   case SUBMENU_MOH_6:
+      strcpy(lcdData, "MOH#6 ");
+      break;      
+   case SUBMENU_MOH_7:
+      strcpy(lcdData, "MOH#7 ");
+      break;      
+   case SUBMENU_UNITS_MPA:
+      strcpy(lcdData, "MPa");
+      break;
+   case SUBMENU_UNITS_PSI:
+      strcpy(lcdData, "PSI");
+      break;
+   case SUBMENU_AGG_SIZE_MED:
+      strcpy(lcdData, "Mrtr-M");
+      break;
+   }
+
+   if (submenuUnits == SUBMENU_UNITS_MPA)
   {
-    strcpy(lcdData, "Std Power");
-  }
-  else if (data ==  SUBMENU_POWER_LOW)
-  {
-    strcpy(lcdData, "Low Power");
-  }
-  else if (data ==  SUBMENU_POWER_HIGH)
-  {
-    strcpy(lcdData, "High Perf");
-  }
-  else if (data ==  SUBMENU_DENSITY_STD)
-  {
-    strcpy(lcdData, "Std Wght ");
-  }
-  else if (data ==  SUBMENU_DENSITY_LIGHT)
-  {
-    strcpy(lcdData, "Lgt Wght ");
-  }
-  else if (data ==  SUBMENU_MOH_3)
-  {
-    strcpy(lcdData, "MOH#3 ");
-  }
-  else if (data ==  SUBMENU_MOH_4)
-  {
-    strcpy(lcdData, "MOH#4 ");
-  }
-  else if (data ==  SUBMENU_MOH_5)
-  {
-    strcpy(lcdData, "MOH#5 ");
-  }
-  else if (data ==  SUBMENU_MOH_6)
-  {
-    strcpy(lcdData, "MOH#6 ");
-  }
-  else if (data == SUBMENU_MOH_7)
-  {
-    strcpy(lcdData, "MOH#7 ");
-  }
-  else if (data == SUBMENU_UNITS_MPA)
-  {
-    strcpy(lcdData, "MPa");
-  }
-  else if (data == SUBMENU_UNITS_PSI)
-  {
-    strcpy(lcdData, "PSI");
-  }
-  else if (data == SUBMENU_AGG_SIZE_MED)
-  {
-    strcpy(lcdData, "Mrtr-M");
-  }
-  else if (submenuUnits == SUBMENU_UNITS_MPA)
-  {
-    if (data == SUBMENU_AGG_SIZE_SMALL)
-    {
-      strcpy(lcdData, "25mm-S");
-    }
-    else if (data == SUBMENU_AGG_SIZE_LARGE)
-    {
-      strcpy(lcdData, "50mm-L");
-    }
-    else if (data == SUBMENU_WEIGHT_HIGH)
-    {
-      strcpy(lcdData, ">.83-h ");
-    }
-    else if (data == SUBMENU_WEIGHT_MED)
-    {
-      strcpy(lcdData, ".83/79m");
-    }
-    else if (data == SUBMENU_WEIGHT_LOW)
-    {
-      strcpy(lcdData, "<.79-l ");
-    }
+      switch(data){
+      case SUBMENU_AGG_SIZE_SMALL:
+         strcpy(lcdData, "25mm-S");
+         break;
+      case SUBMENU_AGG_SIZE_LARGE:
+         strcpy(lcdData, "50mm-L");
+         break;
+      case SUBMENU_WEIGHT_HIGH:
+         strcpy(lcdData, ">.83-h ");
+         break;         
+      case SUBMENU_WEIGHT_MED:
+         strcpy(lcdData, ".83-79m");
+         break;         
+      case SUBMENU_WEIGHT_LOW:
+         strcpy(lcdData, "<.79-l ");
+         break;                  
+      }
   }
   else
   {
-    if (data == SUBMENU_AGG_SIZE_SMALL)
-    {
-      strcpy(lcdData, "1in.-S");
-    }
-    else if (data == SUBMENU_AGG_SIZE_LARGE)
-    {
-      strcpy(lcdData, "2in.-L");
-    }
-    else if (data == SUBMENU_WEIGHT_HIGH)
-    {
-      strcpy(lcdData, ">120-h ");
-    }
-    else if (data == SUBMENU_WEIGHT_MED)
-    {
-      strcpy(lcdData, "115/20m");
-    }
-    else if (data == SUBMENU_WEIGHT_LOW)
-    {
-      strcpy(lcdData, "<115-l ");
-    }
+      switch(data){
+      case SUBMENU_AGG_SIZE_SMALL:
+         strcpy(lcdData, "1in.-S");
+         break;
+      case SUBMENU_AGG_SIZE_LARGE:
+         strcpy(lcdData, "2in.-L");
+         break;
+      case SUBMENU_WEIGHT_HIGH:
+         strcpy(lcdData, ">120-h ");
+         break;         
+      case SUBMENU_WEIGHT_MED:
+         strcpy(lcdData, "115-20m");
+         break;         
+      case SUBMENU_WEIGHT_LOW:
+         strcpy(lcdData, "<115-l ");
+         break;                  
+      }
   }
 }
 
@@ -1605,62 +1593,38 @@ void Display_showTime(void)
 //  This function copies the pressure data to the display.
 //
 //******************************************************************************
-void Display_updateDisplayPressure(signed long pressure)
+void Display_updateDisplayPressure(int32 pressure)
 {
   byte              digit;
-  long              divisor;
+  int32              divisor;
   byte              i;
 
   if (submenuUnits == SUBMENU_UNITS_MPA)
   {
-    strcpy(lcdData, "MPas:");
-    lcdPosition = 5;
+    strcpy(lcdData, "MPA:");
+    lcdPosition = 4;
   }
   else
   {
     strcpy(lcdData, "PSI:");
     lcdPosition = 4;
-    pressure *= PRESSURE_CONV_FACTOR;
+    pressure = pressure * 145 / 10;
   }
-  
-  if (pressure < 10000)
-  {
-    divisor = 1000;
-    for (i = 0 ; i < 4 ; ++i)
-    {
-      digit = pressure / divisor;
-      pressure -= digit * divisor;
-      divisor /= 10;
-      if ((i == 2) && (submenuUnits == SUBMENU_UNITS_MPA))
-      {
-        lcdData[lcdPosition++] = '.';
-      }
-      lcdData[lcdPosition++] = digit + '0';
-    }
-    lcdData[lcdPosition++] = ' ';
-  }
-  else
-  {
     divisor = 10000;
-    for (i = 0 ; i < 5 ; ++i)
-    {
+  for (i = 0 ; i < 5 ; ++i)
+  {
       digit = pressure / divisor;
       pressure -= digit * divisor;
       divisor /= 10;
-      if ((i == 3) && (submenuUnits == SUBMENU_UNITS_MPA))
+      if ((i == 4) && (submenuUnits == SUBMENU_UNITS_MPA))
       {
         lcdData[lcdPosition++] = '.';
       }
       lcdData[lcdPosition++] = digit + '0';
-    }
   }
 
-  if (submenuUnits == SUBMENU_UNITS_PSI)
-  {
-    lcdData[lcdPosition++] = ' ';
-    lcdData[lcdPosition++] = ' ';
-  }
-  lcdData[lcdPosition] = ' ';
+  lcdData[lcdPosition++] = ' '; 
+  lcdData[lcdPosition] = ' '; 
 }
 
 
@@ -1741,11 +1705,6 @@ char Keyboard_getKeyRaw(void)
   byte              temp = 0;
 
   output_high(pin_b3);
-/*  if ((kbd_port & ROW0) != 0)
-  {
-    temp = 1;
-  }
-*/  
   if ((kbd_port & ROW1) != 0) //enter key
   {
     temp = 2;
@@ -1755,13 +1714,7 @@ char Keyboard_getKeyRaw(void)
     temp = 3;
   }
   output_low(pin_b3);
-  output_high(pin_b2);
-/*
-  if ((kbd_port & ROW0) != 0)
-  {
-    temp = 11;
-  }
-*/  
+  output_high(pin_b2); 
   if ((kbd_port & ROW1) != 0) //escape key
   {
     temp = 12;
@@ -1927,7 +1880,6 @@ void LCD_updateDisplay(void)
 }
 
 
-
 //******************************************************************************
 //
 //  Function: LCD_waitForReadySignal()
@@ -2006,103 +1958,52 @@ void main(void)
   lcd_port = 0x38;                      // Set the LCD to 8 bits and 2 lines
   LCD_turnOffCursor();
 
-  output_float(PIN_C4);    //set sda
-  output_float(PIN_C3);   //set scl
-  delay_ms(50);
   Peripheral_readRTC();
-
-  // Test for first time use
-  if (bit_test(timeRTCData[0],7))
-  {   //program enters here
-    adcFullScale   = 255;
-    adcZero        = 0;
-    submenuAggSize = SUBMENU_AGG_SIZE_SMALL;
-    submenuDensity = SUBMENU_DENSITY_STD;
-    submenuMohs    = SUBMENU_MOH_3;
-    submenuPower   = SUBMENU_POWER_STD;
-    submenuWeight  = SUBMENU_WEIGHT_MED;
-    testSetCount   = 0;
-    Peripheral_scaleADC();
-    Config_saveSetup();
-    // set rtc and start for first power up
-    byte               rtc_set[7];        // Data register to set rtc clock
-    rtc_set[0] = 0;
-    rtc_set[1] = 0;
-    rtc_set[2] = 0x40;
-    rtc_set[3] = 1;
-    rtc_set[4] = 1;
-    rtc_set[5] = 1;
-    rtc_set[6] = 1;
-    
-    i2c_start();
-    i2c_write(0xD0);                      // I2C slave read mode - rtc clock address
-    i2c_write(0x00);                      // Point to the start of the clock registers
-    for (i = 0 ; i < 7 ; i++)
-   {
-      i2c_write(rtc_set[i]);
-   }
-   i2c_write(0x00);                      // RTC clock control register
-   i2c_stop();
-  }
   Config_initialize();
 
   // Main forever loop
   while (true)
   {
-
     // Check for keypresses
     key = Keyboard_getKeypress();
     if (keyNewDetection)
     {
       keyNewDetection = false;
-      if (key == 2)
-      {
-        // Handle down key
-        Keyboard_getDownKey();
-      }
-      else if (key == 12)
-      {
-        // Handle up key
-        Keyboard_getUpKey();
-      }
-      else if (key == 3)
-      {
-        // Handle enter key
-        keySet = true;
-      }
-      else if (key == 13)
-      {
-        // Handle escape key
-        keyClear = true;
-      }
-      
+      //set keyCount keySet(Enter) keyClear(Esc)
+      switch(key){
+      case DOWN_KEY:
+         Keyboard_getDownKey();
+         break;
+      case UP_KEY:
+         Keyboard_getUpKey();
+         break;         
+      case ENTER_KEY:
+         keySet = true;//enter key pressed
+         break;         
+      case ESC_KEY:
+         keyClear = true; //escape key pressed
+         break;          
+      }    
+      //display main menu
       if (keyCountNew && !menuShowSubmenu)
       {
-         if (keyCount == MENU_MEASURE)
-         {
+         switch(keyCount){
+         case MENU_MEASURE:
            strcpy(lcdData, "Measure");
-         }
-
-          if (keyCount == MENU_RUN_TEST)
-          {
+           break;
+         case MENU_RUN_TEST:
             strcpy(lcdData, "Run Test");
-          }
-
-         if (keyCount == MENU_SHOW_TESTS)
-         {
+            break;
+         case MENU_SHOW_TESTS:
            strcpy(lcdData, "Show Tests");
-         }
-
-          if (keyCount == MENU_DOWNLOAD_TESTS)
-          {
+           break;
+         case MENU_DOWNLOAD_TESTS:
             strcpy(lcdData, "Download Tests");
-          }
-
-          if (keyCount == MENU_ENTER_SETUP)
-          {
+            break;
+          case MENU_ENTER_SETUP:
             strcpy(lcdData, "Enter Setup");
-          }
-          
+            break;
+         }
          showTime = false;
          LCD_clearDisplay();
          LCD_updateDisplay();
@@ -2116,16 +2017,14 @@ void main(void)
 
       if (menuInitSubmenu || menuShowSubmenu)
       {
-        if (menuLocationNum == MENU_MEASURE)
-        {
+        switch(menuLocationNum){
+        case MENU_MEASURE:
           Display_showMenuMeasure();
-        }
-        else if (menuLocationNum == MENU_RUN_TEST)
-        {
+          break;
+        case MENU_RUN_TEST:
           Display_showMenuRunTest();
-        }
-        else if (menuLocationNum == MENU_SHOW_TESTS)
-        {
+          break;
+        case MENU_SHOW_TESTS:
           if (testSetCount)
           {
             Display_showMenuShowTests();
@@ -2134,9 +2033,8 @@ void main(void)
           {
             keyClear = true;
           }
-        }
-        else if (menuLocationNum == MENU_DOWNLOAD_TESTS)
-        {
+          break;
+        case MENU_DOWNLOAD_TESTS:
           if (testSetCount)
           {
             Display_showMenuDownloadTests();
@@ -2145,33 +2043,27 @@ void main(void)
           {
             keyClear = true;
           }
-        }
-        else if (menuLocationNum == MENU_ENTER_SETUP)
-        {
+          break;
+        case MENU_ENTER_SETUP:
           Display_showMenuEnterSetup();
-        }
-        else if (menuLocationNum == MENU_SHOW_SETTINGS)
-        {
+          break;
+        case MENU_SHOW_SETTINGS:
           Display_showSubmenuShowSettings();
-        }
-        else if (menuLocationNum == MENU_SET_SETTINGS)
-        {
+          break;
+        case MENU_SET_SETTINGS:
           Config_setSettings();
-        }
-        else if (menuLocationNum == MENU_SET_CLOCK)
-        {
+          break;
+        case MENU_SET_CLOCK:
           Display_showSubmenuSetClock();
-        }
-        else if (menuLocationNum == MENU_CALIBRATE)
-        {
+          break;
+        case MENU_CALIBRATE:
           Display_showSubmenuCalibrate();
+          break;        
         }
       }
 
-      if (keySet)
-      {
-        keySet = false;
-      }
+//reset Enter and ESC Buttons
+      keyset = keyset == true? false:keyset;
 
       if (keyClear)
       {
@@ -2248,10 +2140,9 @@ byte Peripheral_readEEPROM(void)
 
   i2c_start();
   i2c_write(0xA0);
-  temp = getHighByte(eepromMemPtr);
-  i2c_write(temp);
-  temp = eepromMemPtr;
-  i2c_write(temp);
+  
+  i2c_write(make8(eepromMemPtr,1));
+  i2c_write(make8(eepromMemPtr,0));
   i2c_start();
   i2c_write(0xA0|1);
   temp = i2c_read(0);
@@ -2280,26 +2171,14 @@ void Peripheral_readRTC(void)
   i2c_write(0x00);                      // Point to the start of the registers
   i2c_start();
   i2c_write(0xD1);                      // I2C slave write mode - RTC clock address
-
-#ifdef DEBUG
-  LCD_setCursorPosition(1, 1);
-#endif  
   
   for (i = 0 ; i < 6 ; i++)
   {
     timeRTCData[i] = i2c_read();
-#ifdef DEBUG
-    LCDData[i] = timeRTCData[i]+48;
-#endif
   }
-  timeRTCData[6] = i2c_read(0);         // + NACK
-  LCDData[6] = timeRTCData[6];
+
+   timeRTCData[6] = i2c_read(0);         // + NACK
   i2c_stop();
-  
-#ifdef DEBUG
-  LCD_UpdateDisplay();
-  while(true);
-#endif  
 
   if (temp != timeRTCData[1] && !menuShowSubmenu)
   {
@@ -2327,11 +2206,11 @@ void Peripheral_saveData(void)
   {
     eepromMemPtr += TEST_SET_SIZE;
   }
-  Peripheral_writeEEPROM(timeRTCData[1]);         // EEPROM Data Offset  0
+  Peripheral_writeEEPROM(timeRTCData[1]);         // EEPROM Data Offset  0 minutes
   ++eepromMemPtr;
-  Peripheral_writeEEPROM(timeRTCData[2]);         // EEPROM Data Offset  1
+  Peripheral_writeEEPROM(timeRTCData[2]);         // EEPROM Data Offset  1 hours
   ++eepromMemPtr;
-  Peripheral_writeEEPROM(timeRTCData[4]);         // EEPROM Data Offset  2
+  Peripheral_writeEEPROM(timeRTCData[4]);         // EEPROM Data Offset  2 day
   ++eepromMemPtr;
   Peripheral_writeEEPROM(timeRTCData[5]);         // EEPROM Data Offset  3
   ++eepromMemPtr;
@@ -2458,20 +2337,21 @@ void Peripheral_writeEEPROM(byte data)
 {
   i2c_start();
   i2c_write(0xA0);
-  i2c_write(getHighByte(eepromMemPtr));
-  i2c_write(eepromMemPtr);
+  i2c_write(make8(eepromMemPtr,1));
+  i2c_write(make8(eepromMemPtr,0));
   i2c_write(data);
   i2c_stop();
   delay_ms(12);
 }
-
+/*
 #ifdef DEBUG
 #inline
 void Break_Point(void){
       showTime = false;
-      LCD_clearDisplay();
+      LCD_setCursorPosition(2, 1);
       strcpy(lcdData, "Break Point");
       LCD_updateDisplay(); while(true);
 }
 
 #endif
+*/
